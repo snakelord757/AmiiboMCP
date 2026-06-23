@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "amiibo": {
+      "command": "java",
+      "args": [
+        "-jar",
+        "build\\libs\\amiibo-mcp-0.1.0.jar"
+      ],
+      "cwd": "D:\\AmiiboMCP",
+      "env": {
+        "AMIIBO_TRANSPORT": "stdio",
+        "AMIIBO_CACHE_TTL_SECONDS": "3600",
+        "AMIIBO_MAX_RESULTS": "50"
+      }
+    }
+  }
+}
