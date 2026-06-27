@@ -119,7 +119,7 @@ Inputs:
 - `showGames`, `showUsage`: optional booleans
 - `limit`: optional integer `1` or greater
 
-`amiiboId` is the full amiibo id string: exactly 16 hex digits matching `^[0-9A-Fa-f]{16}$` (`head` + `tail`), for example `0000000000000002`. The older `id` argument is accepted as a compatibility alias, but agents should prefer `amiiboId`.
+`amiiboId` is the full amiibo id string: exactly 16 hex digits matching `^[0-9A-Fa-f]{16}$`. It is the concatenation of `head` + `tail`: the first 8 digits are `head`, and the last 8 digits are `tail`. Example: `0000000000000002`. The older `id` argument is accepted as a compatibility alias, but agents should prefer `amiiboId`.
 
 Example:
 
@@ -135,7 +135,7 @@ Output is a JSON array of normalized amiibo objects. Searches may return zero, o
 
 ### `get_amiibo_by_id`
 
-Fetches one amiibo by exact amiibo id string. The id must be exactly 16 hex digits matching `^[0-9A-Fa-f]{16}$` and is split into AmiiboAPI `head` and `tail`.
+Fetches one amiibo by exact amiibo id string. The id must be exactly 16 hex digits matching `^[0-9A-Fa-f]{16}$`. It is split into AmiiboAPI `head` and `tail`: first 8 digits are `head`, last 8 digits are `tail`.
 
 Input:
 
@@ -216,12 +216,22 @@ Calls `/api/character/`. Accepts optional `key` or `name`. Output is always an a
 
 ### `game_info`
 
-Calls `/api/amiibo/` with `head`, `tail`, `showgames=true`, and `showusage=true` for one exact amiibo id string of 16 hex digits.
+Returns game compatibility information for one amiibo. Accepts either an exact `amiiboId` string or a visible amiibo `name`.
+
+Use `amiiboId` for exact lookup. `amiiboId` must be exactly 16 hex digits matching `^[0-9A-Fa-f]{16}$` and is `head` + `tail`: first 8 digits are `head`, last 8 digits are `tail`.
+
+Use `name` when the exact id is not known. Name lookup searches `/api/amiibo/` with `name`, `showgames=true`, `showusage=true`, and `limit=1`, then returns the first matching amiibo.
 
 Input:
 
 ```json
 { "amiiboId": "0000000000000002" }
+```
+
+or:
+
+```json
+{ "name": "Mario" }
 ```
 
 The older `{ "id": "0000000000000002" }` shape is accepted as a compatibility alias, but agents should prefer `amiiboId`.

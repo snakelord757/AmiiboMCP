@@ -26,6 +26,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -58,13 +59,13 @@ class AmiiboMcpServerFactory(
             description = """
                 Search amiibo by name or filters. Use this tool when the user does not provide an exact amiiboId string of 16 hex digits, or when the user asks for multiple matches.
                 Send a JSON object with any useful subset of these fields: name, amiiboId, head, tail, type, gameSeries, amiiboSeries, character, showGames, showUsage, limit.
-                If you have an exact full amiibo id string such as 0000000000000002, pass it as amiiboId. If you only have head/tail values, pass head and tail separately. Dictionary filters accept either API keys or visible names.
+                If you have an exact full amiibo id string such as 0000000000000002, pass it as amiiboId. amiiboId is head plus tail: first 8 hex digits are head, last 8 hex digits are tail. If you only have head/tail values, pass head and tail separately. Dictionary filters accept either API keys or visible names.
                 Returns a JSON array; zero, one, or many amiibo may match.
             """.trimIndent(),
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("name", nonBlankStringProperty("Amiibo name search term. Use for visible amiibo names, not ids.", "Mario"))
-                    put("amiiboId", amiiboIdProperty("Exact amiibo id string: 16 hex digits matching ^[0-9A-Fa-f]{16}$. If provided, it is split into head and tail. Prefer this field over legacy id."))
+                    put("amiiboId", amiiboIdProperty("Exact amiibo id string: 16 hex digits matching ^[0-9A-Fa-f]{16}$. This is head + tail: first 8 digits are head, last 8 digits are tail. Prefer this field over legacy id."))
                     put("head", hexStringProperty("Amiibo head string: exactly 8 hex digits matching ^[0-9A-Fa-f]{8}$.", 8, "00000000"))
                     put("tail", hexStringProperty("Amiibo tail string: exactly 8 hex digits matching ^[0-9A-Fa-f]{8}$.", 8, "00000002"))
                     put("type", nonBlankStringProperty("Amiibo type key or name. Use list_amiibo_types first if the user asks for available type values.", "Figure"))
@@ -88,7 +89,7 @@ class AmiiboMcpServerFactory(
             name = "get_amiibo_by_id",
             description = """
                 Fetch exactly one amiibo by full amiibo id.
-                Send JSON like {"amiiboId":"0000000000000002"}. The amiiboId must be a string of exactly 16 hex digits matching ^[0-9A-Fa-f]{16}$, formed as head plus tail.
+                Send JSON like {"amiiboId":"0000000000000002"}. The amiiboId must be a string of exactly 16 hex digits matching ^[0-9A-Fa-f]{16}$. amiiboId is head + tail: first 8 digits are head, last 8 digits are tail.
                 Do not send dictionary keys such as 0x010, names such as Mario, or separate head/tail fields to this tool. Use search_amiibo for those cases.
                 Returns one JSON object or null when no amiibo matches.
             """.trimIndent(),
@@ -178,22 +179,22 @@ class AmiiboMcpServerFactory(
         server.addTool(
             name = "game_info",
             description = """
-                Return game compatibility information for one amiibo by full amiibo id.
-                Send JSON like {"amiiboId":"0000000000000002"}. The amiiboId must be a string of exactly 16 hex digits matching ^[0-9A-Fa-f]{16}$, formed as head plus tail.
-                Do not send dictionary keys such as 0x010, names such as Mario, or separate head/tail fields to this tool. Use search_amiibo first to find the exact id if needed.
-                Returns one JSON object or null when no amiibo matches.
+                Return game compatibility information for one amiibo.
+                Send exactly one of these JSON shapes: {"amiiboId":"0000000000000002"} or {"name":"Mario"}.
+                amiiboId must be a string of exactly 16 hex digits matching ^[0-9A-Fa-f]{16}$. amiiboId is head + tail: first 8 digits are head, last 8 digits are tail.
+                Use amiiboId for an exact lookup. Use name when the user only provided a visible amiibo name; name search returns the first matching amiibo with game compatibility details.
+                Do not send dictionary keys such as 0x010 as amiiboId. Returns one JSON object or null when no amiibo matches.
             """.trimIndent(),
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("amiiboId", amiiboIdProperty())
+                    put("name", nonBlankStringProperty("Visible amiibo name search term. Use this only when amiiboId is not known.", "Mario"))
                 },
-                required = listOf("amiiboId"),
             ),
         ) { request ->
             runTool {
-                val id = amiiboIdArgument(request, "game_info")
-                validateAmiiboId(id)
-                textResult(json.encodeToString(api.gameInfo(id)))
+                val result = gameInfo(request)
+                textResult(json.encodeToString(result))
             }
         }
 
@@ -274,6 +275,30 @@ class AmiiboMcpServerFactory(
             "Provide either amiiboId or legacy id, not both with different values."
         }
     }
+
+    private suspend fun gameInfo(request: CallToolRequest) =
+        gameInfo(requestArguments(request))
+
+    private suspend fun gameInfo(arguments: JsonObject): dev.amiibo.mcp.domain.AmiiboGameInfo? {
+        validateAmiiboIdAliases(arguments)
+        val id = arguments["amiiboId"]?.jsonPrimitive?.contentOrNull
+            ?: arguments["id"]?.jsonPrimitive?.contentOrNull
+        val name = arguments["name"]?.jsonPrimitive?.contentOrNull
+
+        require(!id.isNullOrBlank() || !name.isNullOrBlank()) {
+            "game_info requires exactly one of amiiboId or name."
+        }
+        require(id.isNullOrBlank() || name.isNullOrBlank()) {
+            "game_info accepts exactly one of amiiboId or name, not both."
+        }
+
+        return if (id != null) {
+            validateAmiiboId(id)
+            api.gameInfo(id)
+        } else {
+            api.gameInfoByName(name!!.trim())
+        }
+    }
 }
 
 private fun lookupProperties(keyExample: String, nameExample: String): JsonObject = buildJsonObject {
@@ -281,7 +306,7 @@ private fun lookupProperties(keyExample: String, nameExample: String): JsonObjec
     put("name", nonBlankStringProperty("Dictionary entry visible name to search for. Use this for natural language names.", nameExample))
 }
 
-private fun amiiboIdProperty(description: String = "Exact amiibo id string: 16 hex digits matching ^[0-9A-Fa-f]{16}$, for example 0000000000000002. This is head+tail, not a dictionary key such as 0x000."): JsonObject =
+private fun amiiboIdProperty(description: String = "Exact amiibo id string: 16 hex digits matching ^[0-9A-Fa-f]{16}$, for example 0000000000000002. This is head + tail: first 8 digits are head, last 8 digits are tail. This is not a dictionary key such as 0x000."): JsonObject =
     hexStringProperty(description, 16, "0000000000000002")
 
 private fun nonBlankStringProperty(description: String, example: String): JsonObject = buildJsonObject {

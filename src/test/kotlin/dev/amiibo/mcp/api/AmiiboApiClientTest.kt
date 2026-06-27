@@ -220,6 +220,40 @@ class AmiiboApiClientTest {
     }
 
     @Test
+    fun `loads game info by name with game and usage flags`() = runTest {
+        server.enqueue(
+            MockResponse().setBody(
+                """
+                {
+                  "amiibo": [
+                    {
+                      "amiiboSeries": "Super Smash Bros.",
+                      "character": "Mario",
+                      "gameSeries": "Super Mario",
+                      "head": "00000000",
+                      "tail": "00000002",
+                      "name": "Mario",
+                      "type": "Figure",
+                      "gamesSwitch": [{"gameName": "Super Smash Bros. Ultimate"}]
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+
+        val result = client.gameInfoByName("Mario")
+        val requestUrl = server.takeRequest().requestUrl
+
+        assertEquals("0000000000000002", result?.id)
+        assertEquals("Mario", result?.name)
+        assertEquals("/api/amiibo/", requestUrl?.encodedPath)
+        assertEquals("Mario", requestUrl?.queryParameter("name"))
+        assertEquals("true", requestUrl?.queryParameter("showgames"))
+        assertEquals("true", requestUrl?.queryParameter("showusage"))
+    }
+
+    @Test
     fun `loads figures from multiple game series keys as one list`() = runTest {
         server.enqueue(
             MockResponse().setBody(

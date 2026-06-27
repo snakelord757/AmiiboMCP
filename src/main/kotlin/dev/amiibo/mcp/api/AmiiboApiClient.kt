@@ -100,19 +100,18 @@ class AmiiboApiClient(
                 showUsage = true,
                 limit = 1,
             ),
-        ).firstOrNull()?.let { amiibo ->
-            AmiiboGameInfo(
-                id = amiibo.id,
-                name = amiibo.name,
-                character = amiibo.character,
-                gameSeries = amiibo.gameSeries,
-                amiiboSeries = amiibo.amiiboSeries,
-                games3Ds = amiibo.games3Ds,
-                gamesSwitch = amiibo.gamesSwitch,
-                gamesWiiU = amiibo.gamesWiiU,
-            )
-        }
+        ).firstOrNull()?.toGameInfo()
     }
+
+    suspend fun gameInfoByName(name: String): AmiiboGameInfo? =
+        search(
+            AmiiboSearch(
+                name = name,
+                showGames = true,
+                showUsage = true,
+                limit = 1,
+            ),
+        ).firstOrNull()?.toGameInfo()
 
     suspend fun loadFiguresBySeries(request: LoadFiguresBySeriesRequest): List<Amiibo> {
         val series = listGameSeries(LookupFilter(key = request.key, name = request.name))
@@ -200,6 +199,18 @@ class AmiiboApiClient(
 }
 
 class AmiiboApiException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+
+private fun Amiibo.toGameInfo(): AmiiboGameInfo =
+    AmiiboGameInfo(
+        id = id,
+        name = name,
+        character = character,
+        gameSeries = gameSeries,
+        amiiboSeries = amiiboSeries,
+        games3Ds = games3Ds,
+        gamesSwitch = gamesSwitch,
+        gamesWiiU = gamesWiiU,
+    )
 
 fun JsonElement.arrayOrObject(field: String): List<JsonElement> {
     val value = jsonObject[field] ?: return emptyList()
