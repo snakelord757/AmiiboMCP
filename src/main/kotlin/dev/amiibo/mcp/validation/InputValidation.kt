@@ -18,14 +18,18 @@ private val json = Json { ignoreUnknownKeys = true }
 fun validateSearch(input: AmiiboSearch): AmiiboSearch {
     input.id?.let {
         require(it.length == 16 && hex.matches(it)) {
-            "amiiboId must be a 16-character hexadecimal amiibo id."
+            "amiiboId must be a string of exactly 16 hex digits matching ^[0-9A-Fa-f]{16}$."
         }
     }
     input.head?.let {
-        require(it.length == 8 && hex.matches(it)) { "head must be an 8-character hexadecimal value." }
+        require(it.length == 8 && hex.matches(it)) {
+            "head must be a string of exactly 8 hex digits matching ^[0-9A-Fa-f]{8}$."
+        }
     }
     input.tail?.let {
-        require(it.length == 8 && hex.matches(it)) { "tail must be an 8-character hexadecimal value." }
+        require(it.length == 8 && hex.matches(it)) {
+            "tail must be a string of exactly 8 hex digits matching ^[0-9A-Fa-f]{8}$."
+        }
     }
     input.limit?.let {
         require(it >= 1) { "limit must be at least 1." }
@@ -40,7 +44,7 @@ fun validateSearch(input: AmiiboSearch): AmiiboSearch {
 
 fun validateAmiiboId(id: String): Pair<String, String> {
     require(id.length == 16 && hex.matches(id)) {
-        "amiiboId must be a 16-character hexadecimal amiibo id."
+        "amiiboId must be a string of exactly 16 hex digits matching ^[0-9A-Fa-f]{16}$."
     }
     return id.substring(0, 8) to id.substring(8, 16)
 }

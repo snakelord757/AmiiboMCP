@@ -56,17 +56,17 @@ class AmiiboMcpServerFactory(
         server.addTool(
             name = "search_amiibo",
             description = """
-                Search amiibo by name or filters. Use this tool when the user does not provide an exact 16-character amiibo id, or when the user asks for multiple matches.
+                Search amiibo by name or filters. Use this tool when the user does not provide an exact amiiboId string of 16 hex digits, or when the user asks for multiple matches.
                 Send a JSON object with any useful subset of these fields: name, amiiboId, head, tail, type, gameSeries, amiiboSeries, character, showGames, showUsage, limit.
-                If you have an exact full amiibo id such as 0000000000000002, pass it as amiiboId. If you only have head/tail values, pass head and tail separately. Dictionary filters accept either API keys or visible names.
+                If you have an exact full amiibo id string such as 0000000000000002, pass it as amiiboId. If you only have head/tail values, pass head and tail separately. Dictionary filters accept either API keys or visible names.
                 Returns a JSON array; zero, one, or many amiibo may match.
             """.trimIndent(),
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("name", nonBlankStringProperty("Amiibo name search term. Use for visible amiibo names, not ids.", "Mario"))
-                    put("amiiboId", amiiboIdProperty("Exact 16-character hexadecimal amiibo id. If provided, it is split into head and tail. Prefer this field over legacy id."))
-                    put("head", hexStringProperty("8-character amiibo head hex value.", 8, "00000000"))
-                    put("tail", hexStringProperty("8-character amiibo tail hex value.", 8, "00000002"))
+                    put("amiiboId", amiiboIdProperty("Exact amiibo id string: 16 hex digits matching ^[0-9A-Fa-f]{16}$. If provided, it is split into head and tail. Prefer this field over legacy id."))
+                    put("head", hexStringProperty("Amiibo head string: exactly 8 hex digits matching ^[0-9A-Fa-f]{8}$.", 8, "00000000"))
+                    put("tail", hexStringProperty("Amiibo tail string: exactly 8 hex digits matching ^[0-9A-Fa-f]{8}$.", 8, "00000002"))
                     put("type", nonBlankStringProperty("Amiibo type key or name. Use list_amiibo_types first if the user asks for available type values.", "Figure"))
                     put("gameSeries", nonBlankStringProperty("Game series key or name. Use a value from list_amiibo_series when possible.", "The Legend of Zelda"))
                     put("amiiboSeries", nonBlankStringProperty("Amiibo series key or name. Use a value from list_amiibo_series when possible.", "Super Smash Bros."))
@@ -88,7 +88,7 @@ class AmiiboMcpServerFactory(
             name = "get_amiibo_by_id",
             description = """
                 Fetch exactly one amiibo by full amiibo id.
-                Send JSON like {"amiiboId":"0000000000000002"}. The amiiboId must be exactly 16 hexadecimal characters, formed as head plus tail.
+                Send JSON like {"amiiboId":"0000000000000002"}. The amiiboId must be a string of exactly 16 hex digits matching ^[0-9A-Fa-f]{16}$, formed as head plus tail.
                 Do not send dictionary keys such as 0x010, names such as Mario, or separate head/tail fields to this tool. Use search_amiibo for those cases.
                 Returns one JSON object or null when no amiibo matches.
             """.trimIndent(),
@@ -179,7 +179,7 @@ class AmiiboMcpServerFactory(
             name = "game_info",
             description = """
                 Return game compatibility information for one amiibo by full amiibo id.
-                Send JSON like {"amiiboId":"0000000000000002"}. The amiiboId must be exactly 16 hexadecimal characters, formed as head plus tail.
+                Send JSON like {"amiiboId":"0000000000000002"}. The amiiboId must be a string of exactly 16 hex digits matching ^[0-9A-Fa-f]{16}$, formed as head plus tail.
                 Do not send dictionary keys such as 0x010, names such as Mario, or separate head/tail fields to this tool. Use search_amiibo first to find the exact id if needed.
                 Returns one JSON object or null when no amiibo matches.
             """.trimIndent(),
@@ -281,7 +281,7 @@ private fun lookupProperties(keyExample: String, nameExample: String): JsonObjec
     put("name", nonBlankStringProperty("Dictionary entry visible name to search for. Use this for natural language names.", nameExample))
 }
 
-private fun amiiboIdProperty(description: String = "Exact 16-character hexadecimal amiibo id, for example 0000000000000002. This is head+tail, not a dictionary key such as 0x000."): JsonObject =
+private fun amiiboIdProperty(description: String = "Exact amiibo id string: 16 hex digits matching ^[0-9A-Fa-f]{16}$, for example 0000000000000002. This is head+tail, not a dictionary key such as 0x000."): JsonObject =
     hexStringProperty(description, 16, "0000000000000002")
 
 private fun nonBlankStringProperty(description: String, example: String): JsonObject = buildJsonObject {
