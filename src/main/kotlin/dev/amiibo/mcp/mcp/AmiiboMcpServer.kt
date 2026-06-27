@@ -7,6 +7,7 @@ import dev.amiibo.mcp.domain.AmiiboSearch
 import dev.amiibo.mcp.domain.DictionaryEntry
 import dev.amiibo.mcp.domain.LoadFiguresBySeriesRequest
 import dev.amiibo.mcp.domain.LookupFilter
+import dev.amiibo.mcp.validation.normalizeLoadFiguresBySeries
 import dev.amiibo.mcp.validation.validateAmiiboId
 import dev.amiibo.mcp.validation.validateLoadFiguresBySeries
 import dev.amiibo.mcp.validation.validateSearch
@@ -98,6 +99,22 @@ class AmiiboMcpServerFactory(
         }
 
         server.addTool(
+            name = "random_series",
+            description = "Return one random AmiiboAPI game series dictionary entry as a JSON object with key and name.",
+            inputSchema = ToolSchema(properties = buildJsonObject {}),
+        ) {
+            textResult(json.encodeToString(api.randomSeries()))
+        }
+
+        server.addTool(
+            name = "random_amiibo",
+            description = "Return one random Figure-type amiibo from AmiiboAPI as a JSON object.",
+            inputSchema = ToolSchema(properties = buildJsonObject {}),
+        ) {
+            textResult(json.encodeToString(api.randomAmiibo()))
+        }
+
+        server.addTool(
             name = "load_figures_by_series",
             description = "Resolve AmiiboAPI game series entries by key or name, load Figure-type amiibo for each resolved series key, and return one merged deduplicated JSON array of figures.",
             inputSchema = ToolSchema(
@@ -111,8 +128,22 @@ class AmiiboMcpServerFactory(
             ),
         ) { request ->
             val input = json.decodeFromJsonElement<LoadFiguresBySeriesRequest>(requestArguments(request))
-            val validated = validateLoadFiguresBySeries(input)
+            val validated = validateLoadFiguresBySeries(normalizeLoadFiguresBySeries(input))
             textResult(json.encodeToString<List<Amiibo>>(api.loadFiguresBySeries(validated)))
+        }
+
+        server.addTool(
+            name = "game_info",
+            description = "Return game compatibility information for one amiibo by exact 16-character id. Returns one JSON object or null when no amiibo matches.",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject { put("id", stringProperty("16-character amiibo id.")) },
+                required = listOf("id"),
+            ),
+        ) { request ->
+            val id = requestArguments(request)["id"]?.jsonPrimitive?.content
+                ?: throw IllegalArgumentException("game_info requires id.")
+            validateAmiiboId(id)
+            textResult(json.encodeToString(api.gameInfo(id)))
         }
 
         server.addTool(

@@ -11,6 +11,7 @@ data class Amiibo(
     val gameSeries: String? = null,
     val head: String,
     val tail: String,
+    val id: String = head + tail,
     val name: String,
     val type: String? = null,
     val image: String? = null,
@@ -19,10 +20,19 @@ data class Amiibo(
     @SerialName("games3DS") val games3Ds: JsonElement? = null,
     val gamesSwitch: JsonElement? = null,
     @SerialName("gamesWiiU") val gamesWiiU: JsonElement? = null,
-) {
-    val id: String
-        get() = head + tail
-}
+)
+
+@Serializable
+data class AmiiboGameInfo(
+    val id: String,
+    val name: String,
+    val character: String? = null,
+    val gameSeries: String? = null,
+    val amiiboSeries: String? = null,
+    @SerialName("games3DS") val games3Ds: JsonElement? = null,
+    val gamesSwitch: JsonElement? = null,
+    @SerialName("gamesWiiU") val gamesWiiU: JsonElement? = null,
+)
 
 @Serializable
 data class ReleaseDates(

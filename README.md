@@ -4,7 +4,7 @@ A Kotlin/JVM MCP server that exposes the public [AmiiboAPI](https://www.amiiboap
 
 ## What This Server Does
 
-The server lets an MCP client search amiibo, fetch one amiibo by id, list AmiiboAPI dictionaries, load figures for a game series, and read the API last-updated timestamp. It does not add recommendations, ranking, private data, writes, authentication, or its own database.
+The server lets an MCP client search amiibo, fetch one amiibo by id, list AmiiboAPI dictionaries, pick random amiibo or game series entries, load figures for a game series, read game compatibility information, and read the API last-updated timestamp. It does not add recommendations, ranking, private data, writes, authentication, or its own database.
 
 Implemented transports:
 
@@ -161,6 +161,34 @@ or:
 
 Output is an array of `{ "key": "...", "name": "..." }`. A `key` lookup normally returns zero or one entry; a `name` lookup may return zero, one, or many entries.
 
+### `random_series`
+
+Calls `/api/gameseries/` and returns one random game series dictionary entry.
+
+Input:
+
+```json
+{}
+```
+
+Output:
+
+```json
+{ "key": "0x010", "name": "The Legend of Zelda" }
+```
+
+### `random_amiibo`
+
+Calls `/api/amiibo/?type=Figure` and returns one random Figure-type amiibo.
+
+Input:
+
+```json
+{}
+```
+
+Output is one amiibo object with fields such as `amiiboSeries`, `character`, `gameSeries`, `head`, `tail`, `id`, `name`, `type`, `image`, `imgwebp`, and `release`.
+
 ### `load_figures_by_series`
 
 Resolves AmiiboAPI game series entries by `key` or `name`, loads Figure-type amiibo for each resolved game series key, and returns one merged deduplicated JSON array.
@@ -181,6 +209,31 @@ Calls `/api/amiiboseries/`. Accepts optional `key` or `name`. Output is always a
 ### `list_characters`
 
 Calls `/api/character/`. Accepts optional `key` or `name`. Output is always an array of `{ "key": "...", "name": "..." }`. A `key` lookup normally returns zero or one entry; a `name` lookup may return zero, one, or many entries.
+
+### `game_info`
+
+Calls `/api/amiibo/` with `head`, `tail`, `showgames=true`, and `showusage=true` for one exact 16-character hexadecimal amiibo id.
+
+Input:
+
+```json
+{ "id": "0000000000000002" }
+```
+
+Output is a focused game compatibility object or `null` when no exact amiibo matches:
+
+```json
+{
+  "id": "0000000000000002",
+  "name": "Mario",
+  "character": "Mario",
+  "gameSeries": "Super Mario",
+  "amiiboSeries": "Super Smash Bros.",
+  "games3DS": [],
+  "gamesSwitch": [],
+  "gamesWiiU": []
+}
+```
 
 ### `get_last_updated`
 

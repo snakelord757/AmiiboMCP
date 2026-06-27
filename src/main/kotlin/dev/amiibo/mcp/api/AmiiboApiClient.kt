@@ -2,6 +2,7 @@ package dev.amiibo.mcp.api
 
 import dev.amiibo.mcp.cache.TtlCache
 import dev.amiibo.mcp.domain.Amiibo
+import dev.amiibo.mcp.domain.AmiiboGameInfo
 import dev.amiibo.mcp.domain.AmiiboSearch
 import dev.amiibo.mcp.domain.DictionaryEntry
 import dev.amiibo.mcp.domain.LoadFiguresBySeriesRequest
@@ -77,6 +78,42 @@ class AmiiboApiClient(
 
     suspend fun listCharacters(filter: LookupFilter): List<DictionaryEntry> = dictionary("/api/character/", filter)
 
+    suspend fun listGameSeries(filter: LookupFilter = LookupFilter()): List<DictionaryEntry> =
+        dictionary("/api/gameseries/", filter)
+
+    suspend fun randomSeries(): DictionaryEntry =
+        listGameSeries().randomOrNull()
+            ?: throw AmiiboApiException("AmiiboAPI returned no game series entries.")
+
+    suspend fun randomAmiibo(): Amiibo =
+        search(AmiiboSearch(type = "Figure")).randomOrNull()
+            ?: throw AmiiboApiException("AmiiboAPI returned no Figure amiibo entries.")
+
+    suspend fun gameInfo(id: String): AmiiboGameInfo? {
+        val head = id.substring(0, 8)
+        val tail = id.substring(8, 16)
+        return search(
+            AmiiboSearch(
+                head = head,
+                tail = tail,
+                showGames = true,
+                showUsage = true,
+                limit = 1,
+            ),
+        ).firstOrNull()?.let { amiibo ->
+            AmiiboGameInfo(
+                id = amiibo.id,
+                name = amiibo.name,
+                character = amiibo.character,
+                gameSeries = amiibo.gameSeries,
+                amiiboSeries = amiibo.amiiboSeries,
+                games3Ds = amiibo.games3Ds,
+                gamesSwitch = amiibo.gamesSwitch,
+                gamesWiiU = amiibo.gamesWiiU,
+            )
+        }
+    }
+
     suspend fun loadFiguresBySeries(request: LoadFiguresBySeriesRequest): List<Amiibo> {
         val series = listGameSeries(LookupFilter(key = request.key, name = request.name))
         val figures = series.flatMap { entry ->
@@ -91,9 +128,6 @@ class AmiiboApiClient(
         }.distinctBy { it.id }
         return request.limit?.let { figures.take(it) } ?: figures
     }
-
-    private suspend fun listGameSeries(filter: LookupFilter): List<DictionaryEntry> =
-        dictionary("/api/gameseries/", filter)
 
     suspend fun lastUpdated(): String {
         val root = request("/api/lastupdated/")
@@ -173,7 +207,6 @@ fun JsonElement.arrayOrObject(field: String): List<JsonElement> {
         is JsonArray -> value.jsonArray.toList()
         is JsonObject -> listOf(value)
         is JsonPrimitive -> emptyList()
-        else -> emptyList()
     }
 }
 

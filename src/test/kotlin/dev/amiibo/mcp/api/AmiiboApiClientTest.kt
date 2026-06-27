@@ -10,6 +10,8 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AmiiboApiClientTest {
@@ -107,6 +109,59 @@ class AmiiboApiClientTest {
     }
 
     @Test
+    fun `loads random series from game series endpoint`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"amiibo":[{"key":"0x010","name":"The Legend of Zelda"}]}"""))
+
+        val result = client.randomSeries()
+
+        assertEquals("0x010", result.key)
+        assertEquals("The Legend of Zelda", result.name)
+        assertEquals("/api/gameseries/", server.takeRequest().path)
+    }
+
+    @Test
+    fun `random series fails clearly on empty response`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"amiibo":[]}"""))
+
+        val error = assertFailsWith<AmiiboApiException> {
+            client.randomSeries()
+        }
+
+        assertEquals("AmiiboAPI returned no game series entries.", error.message)
+    }
+
+    @Test
+    fun `loads random amiibo from figure search`() = runTest {
+        server.enqueue(
+            MockResponse().setBody(
+                """
+                {
+                  "amiibo": [
+                    {
+                      "amiiboSeries": "Super Smash Bros.",
+                      "character": "Mario",
+                      "gameSeries": "Super Mario",
+                      "head": "00000000",
+                      "tail": "00000002",
+                      "name": "Mario",
+                      "type": "Figure"
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+
+        val result = client.randomAmiibo()
+        val requestUrl = server.takeRequest().requestUrl
+
+        assertEquals("Mario", result.name)
+        assertEquals("0000000000000002", result.id)
+        assertEquals("/api/amiibo/", requestUrl?.encodedPath)
+        assertEquals("Figure", requestUrl?.queryParameter("type"))
+    }
+
+    @Test
     fun `omits false show games and usage flags`() = runTest {
         server.enqueue(MockResponse().setBody("""{"amiibo":[]}""").setHeader("Content-Type", "application/json"))
 
@@ -115,6 +170,53 @@ class AmiiboApiClientTest {
         val requestUrl = server.takeRequest().requestUrl
         assertEquals(null, requestUrl?.queryParameter("showgames"))
         assertEquals(null, requestUrl?.queryParameter("showusage"))
+    }
+
+    @Test
+    fun `loads game info by id with game and usage flags`() = runTest {
+        server.enqueue(
+            MockResponse().setBody(
+                """
+                {
+                  "amiibo": [
+                    {
+                      "amiiboSeries": "Super Smash Bros.",
+                      "character": "Mario",
+                      "gameSeries": "Super Mario",
+                      "head": "00000000",
+                      "tail": "00000002",
+                      "name": "Mario",
+                      "type": "Figure",
+                      "gamesSwitch": [{"gameName": "Super Smash Bros. Ultimate"}],
+                      "gamesWiiU": [{"gameName": "Super Smash Bros. for Wii U"}],
+                      "games3DS": [{"gameName": "Super Smash Bros. for Nintendo 3DS"}]
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            ),
+        )
+
+        val result = client.gameInfo("0000000000000002")
+        val requestUrl = server.takeRequest().requestUrl
+
+        assertEquals("0000000000000002", result?.id)
+        assertEquals("Mario", result?.name)
+        assertEquals("Super Mario", result?.gameSeries)
+        assertEquals("/api/amiibo/", requestUrl?.encodedPath)
+        assertEquals("00000000", requestUrl?.queryParameter("head"))
+        assertEquals("00000002", requestUrl?.queryParameter("tail"))
+        assertEquals("true", requestUrl?.queryParameter("showgames"))
+        assertEquals("true", requestUrl?.queryParameter("showusage"))
+    }
+
+    @Test
+    fun `game info returns null when no exact amiibo matches`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"amiibo":[]}"""))
+
+        val result = client.gameInfo("0000000000000002")
+
+        assertNull(result)
     }
 
     @Test

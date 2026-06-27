@@ -35,4 +35,22 @@ class InputValidationTest {
             validateLoadFiguresBySeries(LoadFiguresBySeriesRequest())
         }
     }
+
+    @Test
+    fun `normalizes wrapped random series tool result`() {
+        val wrapped = """
+            {
+              "content": [
+                {
+                  "text": "{\n    \"key\": \"0x026\",\n    \"name\": \"Animal Crossing\"\n}",
+                  "type": "text"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = normalizeLoadFiguresBySeries(LoadFiguresBySeriesRequest(key = wrapped))
+
+        assertEquals("0x026", result.key)
+    }
 }
