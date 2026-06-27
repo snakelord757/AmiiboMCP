@@ -17,7 +17,9 @@ private val json = Json { ignoreUnknownKeys = true }
 
 fun validateSearch(input: AmiiboSearch): AmiiboSearch {
     input.id?.let {
-        require(it.length == 16 && hex.matches(it)) { "id must be a 16-character hexadecimal amiibo id." }
+        require(it.length == 16 && hex.matches(it)) {
+            "amiiboId must be a 16-character hexadecimal amiibo id."
+        }
     }
     input.head?.let {
         require(it.length == 8 && hex.matches(it)) { "head must be an 8-character hexadecimal value." }
@@ -37,7 +39,9 @@ fun validateSearch(input: AmiiboSearch): AmiiboSearch {
 }
 
 fun validateAmiiboId(id: String): Pair<String, String> {
-    require(id.length == 16 && hex.matches(id)) { "id must be a 16-character hexadecimal amiibo id." }
+    require(id.length == 16 && hex.matches(id)) {
+        "amiiboId must be a 16-character hexadecimal amiibo id."
+    }
     return id.substring(0, 8) to id.substring(8, 16)
 }
 

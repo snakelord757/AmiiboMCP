@@ -115,9 +115,11 @@ Searches `/api/amiibo/` with combinable filters. The dictionary filters `type`, 
 
 Inputs:
 
-- `name`, `id`, `head`, `tail`, `type`, `gameSeries`, `amiiboSeries`, `character`: optional strings
+- `name`, `amiiboId`, `head`, `tail`, `type`, `gameSeries`, `amiiboSeries`, `character`: optional strings
 - `showGames`, `showUsage`: optional booleans
 - `limit`: optional integer `1` or greater
+
+`amiiboId` is the full 16-character hexadecimal amiibo id (`head` + `tail`), for example `0000000000000002`. The older `id` argument is accepted as a compatibility alias, but agents should prefer `amiiboId`.
 
 Example:
 
@@ -138,8 +140,10 @@ Fetches one amiibo by exact 16-character hexadecimal id. The id is split into Am
 Input:
 
 ```json
-{ "id": "0000000000000002" }
+{ "amiiboId": "0000000000000002" }
 ```
+
+The older `{ "id": "0000000000000002" }` shape is accepted as a compatibility alias, but agents should prefer `amiiboId`.
 
 Output is one amiibo object or `null` when no exact match exists.
 
@@ -217,8 +221,10 @@ Calls `/api/amiibo/` with `head`, `tail`, `showgames=true`, and `showusage=true`
 Input:
 
 ```json
-{ "id": "0000000000000002" }
+{ "amiiboId": "0000000000000002" }
 ```
+
+The older `{ "id": "0000000000000002" }` shape is accepted as a compatibility alias, but agents should prefer `amiiboId`.
 
 Output is a focused game compatibility object or `null` when no exact amiibo matches:
 
@@ -283,7 +289,7 @@ All successful AmiiboAPI JSON responses are cached in memory by endpoint and sor
 
 - `Unsupported AMIIBO_TRANSPORT`: use `stdio`, `http`, or `streamable-http`.
 - SSE client cannot connect: start the server with `AMIIBO_TRANSPORT=sse` and connect to `/sse`.
-- `id must be a 16-character hexadecimal amiibo id`: pass an exact amiibo id, or use `search_amiibo` with separate `head` and `tail`.
+- `amiiboId must be a 16-character hexadecimal amiibo id`: pass an exact full amiibo id as `amiiboId`, or use `search_amiibo` with separate `head` and `tail`.
 - Empty results for a known name: try a broader `name` value and remove dictionary filters.
 - Stdio client hangs: make sure logs are on stderr and the client command points at the built jar.
 

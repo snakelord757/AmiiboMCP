@@ -57,14 +57,14 @@ class AmiiboMcpServerFactory(
             name = "search_amiibo",
             description = """
                 Search amiibo by name or filters. Use this tool when the user does not provide an exact 16-character amiibo id, or when the user asks for multiple matches.
-                Send a JSON object with any useful subset of these fields: name, id, head, tail, type, gameSeries, amiiboSeries, character, showGames, showUsage, limit.
-                If you have an exact full id such as 0000000000000002, pass it as id. If you only have head/tail values, pass head and tail separately. Dictionary filters accept either API keys or visible names.
+                Send a JSON object with any useful subset of these fields: name, amiiboId, head, tail, type, gameSeries, amiiboSeries, character, showGames, showUsage, limit.
+                If you have an exact full amiibo id such as 0000000000000002, pass it as amiiboId. If you only have head/tail values, pass head and tail separately. Dictionary filters accept either API keys or visible names.
                 Returns a JSON array; zero, one, or many amiibo may match.
             """.trimIndent(),
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("name", nonBlankStringProperty("Amiibo name search term. Use for visible amiibo names, not ids.", "Mario"))
-                    put("id", amiiboIdProperty("Exact 16-character hexadecimal amiibo id. If provided, it is split into head and tail."))
+                    put("amiiboId", amiiboIdProperty("Exact 16-character hexadecimal amiibo id. If provided, it is split into head and tail. Prefer this field over legacy id."))
                     put("head", hexStringProperty("8-character amiibo head hex value.", 8, "00000000"))
                     put("tail", hexStringProperty("8-character amiibo tail hex value.", 8, "00000002"))
                     put("type", nonBlankStringProperty("Amiibo type key or name. Use list_amiibo_types first if the user asks for available type values.", "Figure"))
@@ -78,7 +78,7 @@ class AmiiboMcpServerFactory(
             ),
         ) { request ->
             runTool {
-                val input = json.decodeFromJsonElement<AmiiboSearch>(requestArguments(request))
+                val input = json.decodeFromJsonElement<AmiiboSearch>(argumentsWithAmiiboIdAlias(request))
                 val validated = validateSearch(input)
                 textResult(json.encodeToString(api.search(validated)))
             }
@@ -88,18 +88,19 @@ class AmiiboMcpServerFactory(
             name = "get_amiibo_by_id",
             description = """
                 Fetch exactly one amiibo by full amiibo id.
-                Send JSON like {"id":"0000000000000002"}. The id must be exactly 16 hexadecimal characters, formed as head plus tail.
+                Send JSON like {"amiiboId":"0000000000000002"}. The amiiboId must be exactly 16 hexadecimal characters, formed as head plus tail.
                 Do not send dictionary keys such as 0x010, names such as Mario, or separate head/tail fields to this tool. Use search_amiibo for those cases.
                 Returns one JSON object or null when no amiibo matches.
             """.trimIndent(),
             inputSchema = ToolSchema(
-                properties = buildJsonObject { put("id", amiiboIdProperty()) },
-                required = listOf("id"),
+                properties = buildJsonObject {
+                    put("amiiboId", amiiboIdProperty())
+                },
+                required = listOf("amiiboId"),
             ),
         ) { request ->
             runTool {
-                val id = requestArguments(request)["id"]?.jsonPrimitive?.content
-                    ?: throw IllegalArgumentException("get_amiibo_by_id requires id.")
+                val id = amiiboIdArgument(request, "get_amiibo_by_id")
                 validateAmiiboId(id)
                 textResult(json.encodeToString(api.getById(id)))
             }
@@ -178,18 +179,19 @@ class AmiiboMcpServerFactory(
             name = "game_info",
             description = """
                 Return game compatibility information for one amiibo by full amiibo id.
-                Send JSON like {"id":"0000000000000002"}. The id must be exactly 16 hexadecimal characters, formed as head plus tail.
+                Send JSON like {"amiiboId":"0000000000000002"}. The amiiboId must be exactly 16 hexadecimal characters, formed as head plus tail.
                 Do not send dictionary keys such as 0x010, names such as Mario, or separate head/tail fields to this tool. Use search_amiibo first to find the exact id if needed.
                 Returns one JSON object or null when no amiibo matches.
             """.trimIndent(),
             inputSchema = ToolSchema(
-                properties = buildJsonObject { put("id", amiiboIdProperty()) },
-                required = listOf("id"),
+                properties = buildJsonObject {
+                    put("amiiboId", amiiboIdProperty())
+                },
+                required = listOf("amiiboId"),
             ),
         ) { request ->
             runTool {
-                val id = requestArguments(request)["id"]?.jsonPrimitive?.content
-                    ?: throw IllegalArgumentException("game_info requires id.")
+                val id = amiiboIdArgument(request, "game_info")
                 validateAmiiboId(id)
                 textResult(json.encodeToString(api.gameInfo(id)))
             }
@@ -245,6 +247,33 @@ class AmiiboMcpServerFactory(
 
     private fun requestArguments(request: CallToolRequest): JsonObject =
         request.arguments ?: buildJsonObject {}
+
+    private fun argumentsWithAmiiboIdAlias(request: CallToolRequest): JsonObject {
+        val arguments = requestArguments(request)
+        validateAmiiboIdAliases(arguments)
+        val amiiboId = arguments["amiiboId"] ?: return arguments
+        if (arguments["id"] != null) return arguments
+        return buildJsonObject {
+            arguments.forEach { (key, value) -> put(key, value) }
+            put("id", amiiboId)
+        }
+    }
+
+    private fun amiiboIdArgument(request: CallToolRequest, toolName: String): String {
+        val arguments = requestArguments(request)
+        validateAmiiboIdAliases(arguments)
+        return arguments["amiiboId"]?.jsonPrimitive?.content
+            ?: arguments["id"]?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("$toolName requires amiiboId.")
+    }
+
+    private fun validateAmiiboIdAliases(arguments: JsonObject) {
+        val amiiboId = arguments["amiiboId"]?.jsonPrimitive?.content
+        val legacyId = arguments["id"]?.jsonPrimitive?.content
+        require(amiiboId == null || legacyId == null || amiiboId == legacyId) {
+            "Provide either amiiboId or legacy id, not both with different values."
+        }
+    }
 }
 
 private fun lookupProperties(keyExample: String, nameExample: String): JsonObject = buildJsonObject {
